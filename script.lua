@@ -1,139 +1,111 @@
-local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer
 local pGui = player:WaitForChild("PlayerGui")
-
--- Status Variable
 local scriptActive = false
 
--- UI Erstellung
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomQuestGui"
-screenGui.Parent = pGui
+-- UI Setup (Identisch zu deiner Anforderung)
+local screenGui = Instance.new("ScreenGui", pGui)
+screenGui.Name = "DeltaQuestUI"
 screenGui.ResetOnSpawn = false
 
--- Hauptfenster (Beweglich)
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 250, 0, 180)
-mainFrame.Position = UDim2.new(0.5, -125, 0.5, -90)
-mainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-mainFrame.BorderSizePixel = 0
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 220, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -75)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.Active = true
-mainFrame.Draggable = true -- Einfache Methode für Beweglichkeit
-mainFrame.Parent = screenGui
+mainFrame.Draggable = true -- Delta unterstützt Draggable meistens nativ
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 10)
-corner.Parent = mainFrame
+local corner = Instance.new("UICorner", mainFrame)
 
--- Titel
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundTransparency = 1
-title.Text = "Quest Automator"
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 18
-title.Parent = mainFrame
+-- Status Box (Rot = Aus, Grün = An)
+local statusBox = Instance.new("Frame", mainFrame)
+statusBox.Size = UDim2.new(0, 15, 0, 15)
+statusBox.Position = UDim2.new(0.85, 0, 0.1, 0)
+statusBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+Instance.new("UICorner", statusBox).CornerRadius = UDim.new(1, 0)
 
--- Status Licht (Indikator)
-local statusLight = Instance.new("Frame")
-statusLight.Size = UDim2.new(0, 20, 0, 20)
-statusLight.Position = UDim2.new(0.85, 0, 0.1, 0)
-statusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Startet Rot (Aus)
-statusLight.Parent = mainFrame
+-- Start/Stop Frame (Dein Button-Ersatz)
+local actionFrame = Instance.new("Frame", mainFrame)
+actionFrame.Size = UDim2.new(0.8, 0, 0, 40)
+actionFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
+actionFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 
-local lightCorner = Instance.new("UICorner")
-lightCorner.CornerRadius = UDim.new(1, 0)
-lightCorner.Parent = statusLight
-
--- Der "Button" Frame
-local startFrame = Instance.new("Frame")
-startFrame.Name = "StartButton"
-startFrame.Size = UDim2.new(0.8, 0, 0, 50)
-startFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
-startFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-startFrame.Parent = mainFrame
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = startFrame
-
-local btnText = Instance.new("TextLabel")
+local btnText = Instance.new("TextLabel", actionFrame)
 btnText.Size = UDim2.new(1, 0, 1, 0)
 btnText.BackgroundTransparency = 1
 btnText.Text = "START"
-btnText.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnText.Font = Enum.Font.GothamSemibold
-btnText.TextSize = 16
-btnText.Parent = startFrame
+btnText.TextColor3 = Color3.new(1, 1, 1)
+btnText.Font = Enum.Font.GothamBold
 
 --- FUNKTIONEN ---
 
-local function simulateClick(uiElement)
-    if uiElement and uiElement:IsA("GuiObject") then
-        local x = uiElement.AbsolutePosition.X + (uiElement.AbsoluteSize.X / 2)
-        local y = uiElement.AbsolutePosition.Y + (uiElement.AbsoluteSize.Y / 2) + 36 -- Offset für Roblox Topbar
+-- Diese Funktion simuliert einen echten Klick auf Delta
+local function deltaClick(guiElement)
+    if not guiElement or not guiElement.Visible then return end
+    
+    -- Weg 1: Direktes Feuern der Verbindung (Beste Methode für Delta)
+    local connections = getconnections(guiElement.MouseButton1Click)
+    if #connections > 0 then
+        for _, con in pairs(connections) do
+            con:Fire()
+        end
+    else
+        -- Weg 2: VirtualInputManager als Backup mit exakten Koordinaten
+        local x = guiElement.AbsolutePosition.X + (guiElement.AbsoluteSize.X / 2)
+        local y = guiElement.AbsolutePosition.Y + (guiElement.AbsoluteSize.Y / 2) + 58 -- Topbar Offset
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
-        task.wait(0.1)
+        task.wait(0.05)
         VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
     end
 end
 
-local function runQuestLoop()
+local function startLoop()
     while scriptActive do
-        -- 1. Genshiro Quest
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(-1735.23, 37.5, -2606.96)
+        -- 1. Genshiro
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(-1735.23, 37.5, -2606.96)
             task.wait(1)
             fireproximityprompt(workspace.QuestNPCs.Genshiro.HumanoidRootPart["Main Quest"])
             task.wait(1)
         end
 
-        -- 2. Quest UI Klicks (5 mal)
+        -- 5x Quest Klicks
         for i = 1, 5 do
             if not scriptActive then break end
-            local continueBtn = pGui.Quests.QuestUI.Continue
-            local respondBtn = pGui.Quests.QuestUI.Responds.QuestRespond
-            
-            simulateClick(continueBtn)
-            task.wait(1)
-            simulateClick(respondBtn)
+            pcall(function()
+                local qUI = pGui.Quests.QuestUI
+                deltaClick(qUI.Continue)
+                task.wait(1)
+                deltaClick(qUI.Responds.QuestRespond)
+            end)
             task.wait(1)
         end
 
-        -- 3. Hina Quest
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(-1552.25, 4.38, -2796.72)
+        -- 2. Hina
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(-1552.25, 4.38, -2796.72)
             task.wait(1)
             fireproximityprompt(workspace.QuestNPCs.Hina.HumanoidRootPart["Main Quest"])
             task.wait(1)
         end
-        
         task.wait(1)
     end
 end
 
--- Button Logik (Frame Interaction)
-startFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+-- Input Event für den Frame
+actionFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         scriptActive = not scriptActive
         
         if scriptActive then
-            -- Einschalten
-            statusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Grün
+            statusBox.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
             btnText.Text = "STOP"
-            startFrame.BackgroundColor3 = Color3.fromRGB(80, 40, 40)
-            task.spawn(runQuestLoop)
+            task.spawn(startLoop)
         else
-            -- Ausschalten
-            statusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Rot
+            statusBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
             btnText.Text = "START"
-            startFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         end
     end
 end)
