@@ -1,173 +1,129 @@
-local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local UserInputService = game:GetService("UserInputService")
-
+local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local pGui = player:WaitForChild("PlayerGui")
 
-local isRunning = false
+local scriptActive = false
 
--- ### MODERN GUI SETUP ###
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "ModernQuestGui"
+-- UI Erstellung (wie gehabt)
+local screenGui = Instance.new("ScreenGui", pGui)
+screenGui.Name = "DeltaQuestFix"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = pGui
 
--- Hauptfenster (Main Frame)
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 260, 0, 160)
-mainFrame.Position = UDim2.new(0.5, -130, 0.5, -80)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
-mainFrame.BorderSizePixel = 0
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 220, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -110, 0.5, -75)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.Active = true
-mainFrame.Parent = screenGui
+mainFrame.Draggable = true 
+Instance.new("UICorner", mainFrame)
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
-mainCorner.Parent = mainFrame
+local statusBox = Instance.new("Frame", mainFrame)
+statusBox.Size = UDim2.new(0, 15, 0, 15)
+statusBox.Position = UDim2.new(0.85, 0, 0.1, 0)
+statusBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+Instance.new("UICorner", statusBox).CornerRadius = UDim.new(1, 0)
 
--- Titel Leiste
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 35)
-titleLabel.Text = "QUEST MANAGER v2"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 14
-titleLabel.BackgroundTransparency = 1
-titleLabel.Parent = mainFrame
+local actionFrame = Instance.new("Frame", mainFrame)
+actionFrame.Size = UDim2.new(0.8, 0, 0, 40)
+actionFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
+actionFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 
--- Trennlinie
-local line = Instance.new("Frame")
-line.Size = UDim2.new(0.9, 0, 0, 1)
-line.Position = UDim2.new(0.05, 0, 0, 35)
-line.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
-line.BorderSizePixel = 0
-line.Parent = mainFrame
-
--- Der "Button" Frame
-local actionButtonFrame = Instance.new("Frame")
-actionButtonFrame.Size = UDim2.new(0, 200, 0, 45)
-actionButtonFrame.Position = UDim2.new(0.5, -100, 0.5, -5)
-actionButtonFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-actionButtonFrame.BorderSizePixel = 0
-actionButtonFrame.Parent = mainFrame
-
-local btnCorner = Instance.new("UICorner")
-btnCorner.CornerRadius = UDim.new(0, 8)
-btnCorner.Parent = actionButtonFrame
-
-local btnText = Instance.new("TextLabel")
+local btnText = Instance.new("TextLabel", actionFrame)
 btnText.Size = UDim2.new(1, 0, 1, 0)
-btnText.Text = "TOGGLE SCRIPT"
-btnText.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnText.Font = Enum.Font.GothamSemibold
 btnText.BackgroundTransparency = 1
-btnText.Parent = actionButtonFrame
+btnText.Text = "START"
+btnText.TextColor3 = Color3.new(1, 1, 1)
+btnText.Font = Enum.Font.GothamBold
 
--- Status Licht (Box)
-local statusIndicator = Instance.new("Frame")
-statusIndicator.Size = UDim2.new(0, 12, 0, 12)
-statusIndicator.Position = UDim2.new(0.5, -6, 0.85, 0)
-statusIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 120) -- Start: Grün (Aus)
-statusIndicator.BorderSizePixel = 0
-statusIndicator.Parent = mainFrame
+--- HELFER FUNKTIONEN ---
 
-local statusCorner = Instance.new("UICorner")
-statusCorner.CornerRadius = UDim.new(1, 0) -- Macht die Box rund für ein LED-Look
-statusCorner.Parent = statusIndicator
-
--- ### LOGIK ###
-
--- Dragging Funktion
-local dragging, dragInput, dragStart, startPos
-mainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-mainFrame.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- Klick Simulation
-local function simulateClick(target)
-    if target and target.Visible then
-        local pos = target.AbsolutePosition
-        local size = target.AbsoluteSize
-        VirtualInputManager:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2 + 58, 0, true, game, 1)
-        task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(pos.X + size.X/2, pos.Y + size.Y/2 + 58, 0, false, game, 1)
+local function safeClick(guiElement)
+    if guiElement and guiElement.Visible then
+        -- Versuche erst getconnections (Delta spezial)
+        local success, err = pcall(function()
+            local cons = getconnections(guiElement.MouseButton1Click)
+            if #cons > 0 then
+                for _, v in pairs(cons) do v:Fire() end
+            else
+                -- Fallback auf VIM
+                local x = guiElement.AbsolutePosition.X + (guiElement.AbsoluteSize.X / 2)
+                local y = guiElement.AbsolutePosition.Y + (guiElement.AbsoluteSize.Y / 2) + 58
+                VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 1)
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 1)
+            end
+        end)
     end
 end
 
--- Quest Ablauf
-local function runQuests()
-    while isRunning do
-        -- GENSHIRO
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(-1735.232, 37.499, -2606.960)
-            task.wait(1)
-            fireproximityprompt(workspace.QuestNPCs.Genshiro.HumanoidRootPart["Main Quest"])
-            
-            for i = 1, 5 do
-                if not isRunning then break end
-                simulateClick(pGui.Quests.QuestUI.Continue)
-                task.wait(0.5)
-            end
-            for i = 1, 5 do
-                if not isRunning then break end
-                simulateClick(pGui.Quests.QuestUI.Responds.QuestRespond)
-                task.wait(0.5)
-            end
-        end
-
-        -- HINA
-        if not isRunning then break end
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = CFrame.new(-1552.253, 4.378, -2796.724)
-            task.wait(1)
-            fireproximityprompt(workspace.QuestNPCs.Hina.HumanoidRootPart["Main Quest"])
-
-            for i = 1, 5 do
-                if not isRunning then break end
-                simulateClick(pGui.Quests.QuestUI.Continue)
-                task.wait(0.5)
-            end
-            for i = 1, 5 do
-                if not isRunning then break end
-                simulateClick(pGui.Quests.QuestUI.Responds.QuestRespond)
-                task.wait(0.5)
-            end
-        end
-        task.wait(2)
-    end
-end
-
--- Button Action
-actionButtonFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        isRunning = not isRunning
+local function handleQuestUI()
+    -- Diese Schleife klickt 5 mal, wie gewünscht
+    for i = 1, 5 do
+        if not scriptActive then break end
         
-        if isRunning then
-            statusIndicator.BackgroundColor3 = Color3.fromRGB(255, 50, 50) -- Rot (Aktiv)
-            actionButtonFrame.BackgroundColor3 = Color3.fromRGB(70, 60, 60)
-            task.spawn(runQuests)
+        local questUI = pGui:FindFirstChild("Quests") and pGui.Quests:FindFirstChild("QuestUI")
+        if questUI then
+            local continueBtn = questUI:FindFirstChild("Continue")
+            local respondBtn = questUI:FindFirstChild("Responds") and questUI.Responds:FindFirstChild("QuestRespond")
+            
+            if continueBtn and continueBtn.Visible then
+                safeClick(continueBtn)
+            end
+            task.wait(1)
+            if respondBtn and respondBtn.Visible then
+                safeClick(respondBtn)
+            end
+        end
+        task.wait(1)
+    end
+end
+
+local function runMainScript()
+    while scriptActive do
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if root then
+            -- SCHRITT 1: Genshiro Quest
+            root.CFrame = CFrame.new(-1735.23, 37.5, -2606.96)
+            task.wait(1.5) -- Kurz warten bis NPC geladen
+            
+            local genshiro = workspace.QuestNPCs:FindFirstChild("Genshiro")
+            if genshiro and genshiro:FindFirstChild("HumanoidRootPart") then
+                fireproximityprompt(genshiro.HumanoidRootPart:FindFirstChild("Main Quest"))
+                task.wait(1)
+                handleQuestUI() -- Die 5 Klicks
+            end
+            
+            task.wait(2) -- Pause zwischen den Quests
+
+            -- SCHRITT 2: Hina Quest
+            root.CFrame = CFrame.new(-1552.25, 4.38, -2796.72)
+            task.wait(1.5)
+            
+            local hina = workspace.QuestNPCs:FindFirstChild("Hina")
+            if hina and hina:FindFirstChild("HumanoidRootPart") then
+                fireproximityprompt(hina.HumanoidRootPart:FindFirstChild("Main Quest"))
+                task.wait(1)
+                handleQuestUI() -- Die 5 Klicks
+            end
+        end
+        task.wait(1)
+    end
+end
+
+-- Button Logik
+actionFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        scriptActive = not scriptActive
+        if scriptActive then
+            statusBox.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+            btnText.Text = "STOP"
+            task.spawn(runMainScript)
         else
-            statusIndicator.BackgroundColor3 = Color3.fromRGB(0, 255, 120) -- Grün (Inaktiv)
-            actionButtonFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            statusBox.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+            btnText.Text = "START"
         end
     end
 end)
